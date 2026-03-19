@@ -6,7 +6,7 @@ function gadget:GetInfo()
 		desc      = "Implements the Ferry command spec for air transports.",
 		author    = "Isajoefeat & Gemini",
 		date      = "2026",
-		license   = "poop",
+		license   = "GNU GPL, v2 or later",
 		layer     = 0,
 		enabled   = true
 	}
@@ -165,27 +165,27 @@ end
 
 function gadget:UnitDestroyed(unitID)
 	unitsWaiting[unitID] = nil
-	taxiHomePos[unitID] = nil -- Cleanup if transport dies
+	taxiHomePos[unitID] = nil
 end
 
 function gadget:Initialize()
-    BuildDefCaches()
+	BuildDefCaches()
+	
+	gadgetHandler:RegisterCMDID(CMD_TRANSPORT_TO)
 
-    gadgetHandler:RegisterCMDID(CMD_TRANSPORT_TO) 
+	local transportToCmdDesc = { 
+		id      = CMD_TRANSPORT_TO, 
+		type    = CMD_TYPE_GROUND, 
+		name    = "Transport To", 
+		action  = "transport_to", 
+		tooltip = "Taxi service.", 
+		cursor  = "Transport" 
+	}
 
-    local transportToCmdDesc = { 
-        id      = CMD_TRANSPORT_TO, 
-        type    = CMD_TYPE_GROUND, 
-        name    = "Transport To", 
-        action  = "transportto", 
-        tooltip = "Taxi service.", 
-        cursor  = "Transport" 
-    }
-
-    for , unitID in ipairs(Spring.GetAllUnits()) do
-        local unitDefID = SpGetUnitDefID(unitID)
-        if transportableUnits[unitDefID] then 
-            Spring.InsertUnitCmdDesc(unitID, transportToCmdDesc) 
-        end
-    end
+	for _, unitID in ipairs(Spring.GetAllUnits()) do
+		local unitDefID = SpGetUnitDefID(unitID)
+		if transportableUnits[unitDefID] then 
+			Spring.InsertUnitCmdDesc(unitID, transportToCmdDesc) 
+		end
+	end
 end
