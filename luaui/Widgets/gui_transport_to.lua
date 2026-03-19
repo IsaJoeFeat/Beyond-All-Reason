@@ -23,7 +23,7 @@ function widget:DrawWorld()
 	-- Only draw icons for our own team's units
 	local myUnits = Spring.GetTeamUnits(Spring.GetMyTeamID())
 	
-	gl.Texture(taxiIcon)
+	--gl.Texture(taxiIcon)
 	for i = 1, #myUnits do
 		local uID = myUnits[i]
 		if Spring.GetUnitRulesParam(uID, "waiting_for_taxi") == 1 then

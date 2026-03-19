@@ -169,9 +169,23 @@ function gadget:UnitDestroyed(unitID)
 end
 
 function gadget:Initialize()
-	BuildDefCaches()
-	local transportToCmdDesc = { id=CMD_TRANSPORT_TO, type=CMD_TYPE_GROUND, name="Transport To", action="transport_to", tooltip="Taxi service.", cursor="Transport" }
-	for _, unitID in ipairs(Spring.GetAllUnits()) do
-		if transportableUnits[SpGetUnitDefID(unitID)] then Spring.InsertUnitCmdDesc(unitID, transportToCmdDesc) end
-	end
+    BuildDefCaches()
+
+    gadgetHandler:RegisterCMDID(CMD_TRANSPORT_TO) 
+
+    local transportToCmdDesc = { 
+        id      = CMD_TRANSPORT_TO, 
+        type    = CMD_TYPE_GROUND, 
+        name    = "Transport To", 
+        action  = "transportto", 
+        tooltip = "Taxi service.", 
+        cursor  = "Transport" 
+    }
+
+    for , unitID in ipairs(Spring.GetAllUnits()) do
+        local unitDefID = SpGetUnitDefID(unitID)
+        if transportableUnits[unitDefID] then 
+            Spring.InsertUnitCmdDesc(unitID, transportToCmdDesc) 
+        end
+    end
 end
