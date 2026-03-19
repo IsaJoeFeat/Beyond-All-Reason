@@ -157,7 +157,13 @@ function gadget:GameFrame(frame)
 end
 
 function gadget:UnitCreated(unitID, unitDefID, teamID)
-	if transportableUnits[unitDefID] then
+	-- We use Spring.GetUnitTeam(unitID) to ensure we have the correct ID
+	local curTeam = Spring.GetUnitTeam(unitID)
+	
+	-- FORCE: For testing, we will add the button to ALL units 
+	-- that aren't planes or buildings to ensure the logic works.
+	local ud = UnitDefs[unitDefID]
+	if ud and not ud.canFly and not ud.isBuilding then
 		Spring.InsertUnitCmdDesc(unitID, transportToCmdDesc)
 	end
 end
@@ -170,14 +176,14 @@ end
 function gadget:Initialize()
 	BuildDefCaches()
 	
-	-- CRITICAL FIX: 
-	-- We remove RegisterCMDID entirely because the engine already 
-	-- registers it when it sees it inside a CmdDesc.
-	-- This stops the "Duplicate CMD_ID" crash.
+	-- We don't call RegisterCMDID here to avoid the crash.
+	-- The engine will "Autoregister" when it sees the button inserted below.
 
 	local allUnits = Spring.GetAllUnits()
 	for i = 1, #allUnits do
 		local uID = allUnits[i]
-		gadget:UnitCreated(uID, SpGetUnitDefID(uID))
+		local uDefID = SpGetUnitDefID(uID)
+		-- Manually trigger the button insertion for everyone already on the map
+		gadget:UnitCreated(uID, uDefID)
 	end
 end
