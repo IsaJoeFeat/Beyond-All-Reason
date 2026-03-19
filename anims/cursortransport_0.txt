@@ -1,0 +1,2 @@
+hotspot center
+frame anims/cursortransport_0.png 5
