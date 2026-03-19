@@ -3,7 +3,7 @@ local gadget = gadget ---@type Gadget
 function gadget:GetInfo()
 	return {
 		name      = "Transport To (Synced)",
-		desc      = "Implements the Ferry command spec for air transports.",
+		desc      = "Ferry Spec Implementation",
 		author    = "Isajoefeat & Gemini",
 		date      = "2026",
 		license   = "GNU GPL, v2 or later",
@@ -15,9 +15,11 @@ end
 if not gadgetHandler:IsSyncedCode() then return end
 
 -- =============================================================================
--- Constants
+-- Constants & Registration
 -- =============================================================================
 local CMD_TRANSPORT_TO = 34571 
+gadgetHandler:RegisterCMDID(CMD_TRANSPORT_TO)
+
 local CMD_TYPE_GROUND  = CMDTYPE.ICON_MAP 
 local CMD_LOAD_UNITS   = CMD.LOAD_UNITS
 local CMD_UNLOAD_UNITS = CMD.UNLOAD_UNITS
@@ -26,7 +28,7 @@ local CMD_MOVE         = CMD.MOVE
 local transportableUnits = {} 
 local transportStats     = {} 
 local unitStats          = {}
-local unitsWaiting       = {} -- [unitID] = {pos, teamID, assignedTaxi}
+local unitsWaiting       = {} -- [unitID] = {teamID, assignedTaxi}
 local taxiHomePos        = {} -- [taxiID] = {x, y, z}
 
 local SpGetUnitDefID      = Spring.GetUnitDefID
@@ -36,7 +38,7 @@ local SpSetUnitMoveGoal   = Spring.SetUnitMoveGoal
 local SpGetUnitCommands   = Spring.GetUnitCommands
 local SpSetUnitRulesParam = Spring.SetUnitRulesParam
 
--- Shared command description table
+-- Command look and feel
 local transportToCmdDesc = { 
 	id      = CMD_TRANSPORT_TO, 
 	type    = CMD_TYPE_GROUND, 
@@ -47,7 +49,7 @@ local transportToCmdDesc = {
 }
 
 -- =============================================================================
--- Helpers
+-- Logic Functions
 -- =============================================================================
 
 local function BuildDefCaches()
@@ -56,7 +58,6 @@ local function BuildDefCaches()
 			transportStats[unitDefID] = { massLimit = ud.transportMass or 0, sizeLimit = ud.transportSize or 0 }
 		end
 		unitStats[unitDefID] = { mass = ud.mass or 0, size = ud.xsize or 0 }
-		-- Transportable if not a plane/building, or if it's a factory (rally point support)
 		if (not ud.canFly and not ud.isBuilding and (ud.cantBeTransported == nil or ud.cantBeTransported == false)) or ud.isFactory then
 			transportableUnits[unitDefID] = true
 		end
@@ -69,13 +70,12 @@ local function CanLink(taxiID, cargoID)
 	local tStat = transportStats[tDefID]
 	local uStat = unitStats[uDefID]
 	if not tStat or not uStat then return false end
-	-- Transport must be empty to be 'eligible'
 	if #(Spring.GetUnitIsTransporting(taxiID) or {}) > 0 then return false end
 	return (uStat.mass <= tStat.massLimit) and (uStat.size <= tStat.sizeLimit * 2)
 end
 
 -- =============================================================================
--- Callins
+-- Callins (Engine Handlers)
 -- =============================================================================
 
 function gadget:AllowCommand(unitID, unitDefID, teamID, cmdID, cmdParams, cmdOptions)
@@ -86,7 +86,6 @@ end
 function gadget:CommandFallback(unitID, unitDefID, teamID, cmdID, cmdParams, cmdOptions)
 	if cmdID ~= CMD_TRANSPORT_TO then return false end
 	
-	-- Clear UI icon if being carried
 	if Spring.GetUnitTransporter(unitID) then 
 		SpSetUnitRulesParam(unitID, "waiting_for_taxi", 0, {public = true})
 		return true, false 
@@ -95,28 +94,20 @@ function gadget:CommandFallback(unitID, unitDefID, teamID, cmdID, cmdParams, cmd
 	local ux, uy, uz = SpGetUnitPosition(unitID)
 	local tx, ty, tz = cmdParams[1], cmdParams[2], cmdParams[3]
 	
-	-- Arrival Check (Mission Complete)
 	if ((ux-tx)^2 + (uz-tz)^2) < (45*45) then
 		unitsWaiting[unitID] = nil
 		SpSetUnitRulesParam(unitID, "waiting_for_taxi", 0, {public = true})
 		return true, true 
 	end
 
-	-- Register Waiting State
 	if not unitsWaiting[unitID] then
 		unitsWaiting[unitID] = { teamID = teamID, assignedTaxi = nil }
 		SpSetUnitRulesParam(unitID, "waiting_for_taxi", 1, {public = true})
 	end
 
-	-- Behavior logic: Stop if taxi assigned, walk if not
 	local taxi = unitsWaiting[unitID].assignedTaxi
 	if taxi and Spring.ValidUnitID(taxi) and not Spring.GetUnitIsDead(taxi) then
-		local taxiCmds = SpGetUnitCommands(taxi, 1)
-		if taxiCmds and #taxiCmds > 0 then
-			SpSetUnitMoveGoal(unitID, ux, uy, uz) -- Wait at current spot
-		else
-			unitsWaiting[unitID].assignedTaxi = nil
-		end
+		SpSetUnitMoveGoal(unitID, ux, uy, uz) -- Stop and wait
 	else
 		SpSetUnitMoveGoal(unitID, tx, ty, tz) -- Walk fallback
 		unitsWaiting[unitID].assignedTaxi = nil
@@ -136,7 +127,6 @@ function gadget:GameFrame(frame)
 			
 			for i = 1, #teamUnits do
 				local tID = teamUnits[i]
-				-- Closest idle eligible air transport
 				if transportStats[SpGetUnitDefID(tID)] and #SpGetUnitCommands(tID, 0) == 0 and CanLink(tID, unitID) then
 					local tx, ty, tz = SpGetUnitPosition(tID)
 					local dSq = (ux-tx)^2 + (uz-tz)^2
@@ -149,7 +139,7 @@ function gadget:GameFrame(frame)
 				local hx, hy, hz = SpGetUnitPosition(bestTaxi)
 				taxiHomePos[bestTaxi] = {hx, hy, hz}
 				
-				-- Order Chain: Load -> [Waypoints] -> Unload -> Return
+				-- The Flight Plan
 				SpGiveOrderToUnit(bestTaxi, CMD_LOAD_UNITS, {unitID}, {})
 				
 				local unitQueue = SpGetUnitCommands(unitID, 5)
@@ -164,7 +154,6 @@ function gadget:GameFrame(frame)
 						end
 					else break end
 				end
-				
 				SpGiveOrderToUnit(bestTaxi, CMD_MOVE, {hx, hy, hz}, {"shift"}) 
 			end
 		end
@@ -184,11 +173,8 @@ end
 
 function gadget:Initialize()
 	BuildDefCaches()
-	
-	-- Command Registration
 	gadgetHandler:RegisterCMDID(CMD_TRANSPORT_TO)
 	
-	-- Apply to units already on map
 	local allUnits = Spring.GetAllUnits()
 	for i = 1, #allUnits do
 		local uID = allUnits[i]
