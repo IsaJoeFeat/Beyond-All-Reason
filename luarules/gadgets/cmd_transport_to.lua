@@ -77,8 +77,6 @@ end
 -- =============================================================================
 
 function gadget:AllowCommand(unitID, unitDefID, teamID, cmdID, cmdParams, cmdOptions)
-    -- This handles the engine logic for the command
-	if cmdID == CMD_TRANSPORT_TO then return true end
 	return true
 end
 
@@ -144,7 +142,7 @@ function gadget:GameFrame(frame)
 				for i = 1, #unitQueue do
 					local cmd = unitQueue[i]
 					if cmd.id == CMD_TRANSPORT_TO then
-						local isLast = (i == #unitQueue or unitQueue[i+1].id ~= CMD_TRANSPORT_TO)
+						local isLast = (i == #unitQueue or (unitQueue[i+1] and unitQueue[i+1].id ~= CMD_TRANSPORT_TO))
 						if isLast then
 							SpGiveOrderToUnit(bestTaxi, CMD_UNLOAD_UNITS, {cmd.params[1], cmd.params[2], cmd.params[3]}, {"shift"})
 						else
@@ -172,11 +170,10 @@ end
 function gadget:Initialize()
 	BuildDefCaches()
 	
-	-- 1. Register only ONCE here
-	gadgetHandler:RegisterCMDID(CMD_TRANSPORT_TO)
-	
-	-- 2. Explicitly whitelist the ID to silence the warning
-	handler.whitelistIDs = { [CMD_TRANSPORT_TO] = true }
+	-- CRITICAL FIX: 
+	-- We remove RegisterCMDID entirely because the engine already 
+	-- registers it when it sees it inside a CmdDesc.
+	-- This stops the "Duplicate CMD_ID" crash.
 
 	local allUnits = Spring.GetAllUnits()
 	for i = 1, #allUnits do
