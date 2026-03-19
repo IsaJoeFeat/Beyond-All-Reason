@@ -577,8 +577,10 @@
 		"pauseScreen": {
 			"paused": "GAME  PAUSED"
 		},
-		"transport_to": "Transport To",
-  "transport_to_tooltip": "Call the nearest idle air transport to move this unit to the destination.",
+    "transport_to": "Transport To",
+    "transport_to_tooltip": "Call the nearest idle air transport to move this unit to the destination.",
+    "waiting_for_taxi": "Waiting for Transport",
+    "taxi_dispatched": "Transport En Route"
 		},
 		"voting": {
 			"no": "NO",
