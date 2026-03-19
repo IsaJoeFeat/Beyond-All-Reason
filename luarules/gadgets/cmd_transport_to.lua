@@ -15,10 +15,9 @@ end
 if not gadgetHandler:IsSyncedCode() then return end
 
 -- =============================================================================
--- Constants & Registration
+-- Constants
 -- =============================================================================
 local CMD_TRANSPORT_TO = 34571 
-gadgetHandler:RegisterCMDID(CMD_TRANSPORT_TO)
 
 local CMD_TYPE_GROUND  = CMDTYPE.ICON_MAP 
 local CMD_LOAD_UNITS   = CMD.LOAD_UNITS
@@ -38,7 +37,6 @@ local SpSetUnitMoveGoal   = Spring.SetUnitMoveGoal
 local SpGetUnitCommands   = Spring.GetUnitCommands
 local SpSetUnitRulesParam = Spring.SetUnitRulesParam
 
--- Command look and feel
 local transportToCmdDesc = { 
 	id      = CMD_TRANSPORT_TO, 
 	type    = CMD_TYPE_GROUND, 
@@ -49,7 +47,7 @@ local transportToCmdDesc = {
 }
 
 -- =============================================================================
--- Logic Functions
+-- Helpers
 -- =============================================================================
 
 local function BuildDefCaches()
@@ -75,11 +73,12 @@ local function CanLink(taxiID, cargoID)
 end
 
 -- =============================================================================
--- Callins (Engine Handlers)
+-- Callins
 -- =============================================================================
 
 function gadget:AllowCommand(unitID, unitDefID, teamID, cmdID, cmdParams, cmdOptions)
-	if cmdID == CMD_TRANSPORT_TO then return transportableUnits[unitDefID] ~= nil end
+    -- This handles the engine logic for the command
+	if cmdID == CMD_TRANSPORT_TO then return true end
 	return true
 end
 
@@ -107,9 +106,9 @@ function gadget:CommandFallback(unitID, unitDefID, teamID, cmdID, cmdParams, cmd
 
 	local taxi = unitsWaiting[unitID].assignedTaxi
 	if taxi and Spring.ValidUnitID(taxi) and not Spring.GetUnitIsDead(taxi) then
-		SpSetUnitMoveGoal(unitID, ux, uy, uz) -- Stop and wait
+		SpSetUnitMoveGoal(unitID, ux, uy, uz)
 	else
-		SpSetUnitMoveGoal(unitID, tx, ty, tz) -- Walk fallback
+		SpSetUnitMoveGoal(unitID, tx, ty, tz)
 		unitsWaiting[unitID].assignedTaxi = nil
 	end
 
@@ -139,7 +138,6 @@ function gadget:GameFrame(frame)
 				local hx, hy, hz = SpGetUnitPosition(bestTaxi)
 				taxiHomePos[bestTaxi] = {hx, hy, hz}
 				
-				-- The Flight Plan
 				SpGiveOrderToUnit(bestTaxi, CMD_LOAD_UNITS, {unitID}, {})
 				
 				local unitQueue = SpGetUnitCommands(unitID, 5)
@@ -173,8 +171,13 @@ end
 
 function gadget:Initialize()
 	BuildDefCaches()
+	
+	-- 1. Register only ONCE here
 	gadgetHandler:RegisterCMDID(CMD_TRANSPORT_TO)
 	
+	-- 2. Explicitly whitelist the ID to silence the warning
+	handler.whitelistIDs = { [CMD_TRANSPORT_TO] = true }
+
 	local allUnits = Spring.GetAllUnits()
 	for i = 1, #allUnits do
 		local uID = allUnits[i]
